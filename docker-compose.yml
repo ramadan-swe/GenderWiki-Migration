@@ -1,0 +1,44 @@
+services:
+  db:
+    image: mariadb:10.11.14
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 'rootPw0rd'
+      MYSQL_DATABASE: "genderiyya_wiki"
+      MYSQL_USER: "genderiyya_wiki"
+      MYSQL_PASSWORD: 'SuperS3cretPw0rd'
+    volumes:
+      # Import the SQL backup only on the first initialization
+      - ./genderiyya_wiki-20260303.sql:/docker-entrypoint-initdb.d/genderiyya_wiki-20260303.sql:ro
+      - db_data:/var/lib/mysql
+
+  php-fpm:
+    build: ./docker/php-fpm
+    depends_on:
+      - db
+    volumes:
+      - ./www:/var/www/html:delegated
+      - ./www/.php.ini:/usr/local/etc/php/conf.d/99-mediawiki.ini:ro
+      - /home/ahmed/Sync/genderiyya/repository:/srv/repositorea/genderiyya.xyz
+      - ./docker/websecrets/genderiyya.xyz:/srv/websecrets/genderiyya.xyz:ro
+    expose:
+      - 9000
+
+  web:
+    build: ./docker/apache
+    depends_on:
+      - php-fpm
+    ports:
+      - "8080:80"
+    volumes:
+      - ./www:/var/www/html:delegated
+      - /home/ahmed/Sync/genderiyya/repository:/srv/repositorea/genderiyya.xyz
+      - ./docker/websecrets/genderiyya.xyz:/srv/websecrets/genderiyya.xyz:ro
+    environment:
+      - APACHE_RUN_USER=www-data
+      - APACHE_RUN_GROUP=www-data
+
+volumes:
+  db_data:

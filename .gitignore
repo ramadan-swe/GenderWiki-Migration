@@ -1,0 +1,15 @@
+www/*
+www-backup*/
+mediawiki-*/
+*.sql
+__pycache__/
+.venv/
+apicache/
+families/
+logs/
+xml/
+*.lwp
+user-passwords.py
+*.zip
+*.xz
+*.gz

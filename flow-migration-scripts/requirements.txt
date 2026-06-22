@@ -1,0 +1,9 @@
+certifi==2026.5.20
+charset-normalizer==3.4.7
+idna==3.18
+mwparserfromhell==0.7.2
+packaging==26.2
+pymysql==1.2.0
+pywikibot==11.3.0
+requests==2.34.2
+urllib3==2.7.0

@@ -1,0 +1,4 @@
+<?php
+// Mounted by `www/LocalSettings.php`.
+// Keep this file valid PHP only; any text outside PHP tags will be output.
+$wgDBpassword = 'SuperS3cretPw0rd';
