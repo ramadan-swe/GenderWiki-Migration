@@ -1,0 +1,10 @@
+<br />
+<b>Deprecated</b>:  Use of MediaWiki\Parser\Parser::$mExtRegexFun was deprecated in MediaWiki 1.42. [Called from ExtRegexFun::onParserClearState in /var/www/html/mw/extensions/RegexFun/RegexFun.php at line 710] in <b>/var/www/html/mw/includes/debug/MWDebug.php</b> on line <b>385</b><br />
+<onlyinclude><includeonly>;{{#regex:{{{نسق|{{{1|}}}}}}|/^(?:(\d)*:)?([\pL\pM\s]+)(?::([1؟\+\*])?)?$/Uu|}}{{#tag:html|<span id="param-{{#replace:{{#regex_var:2}}| |_}}">{{#if:{{#regex_var:1}}|{{#regex_var:1}}{{!}}}}{{#regex_var:2}}{{#if:{{#regex_var:3}}|<nowiki>:</nowiki>{{#ifeq:{{#regex_var:3}}|*|&lowast;|{{#regex_var:3}}}}}}}}:{{{وصف|{{{2|}}}}}} {{#tag:span|{{#switch:{{#regex_var:3}}
+|1 = ضروري؛ قيمة واحدة
+|+ = ضروري؛ قيمة أو أكثر
+|؟ = اختياري؛ قيمة واحدة
+|* = اختياري؛ قيمة أو أكثر
+}}|style="text-decoration: underline;"}}. {{#if:{{{استبدائية|{{{3|}}}}}}|القيمة الاستبدائية "<kbd>{{{استبدائية|{{{3|}}}}}}</kbd>".}} {{#if:{{{خصيصة|{{{4|}}}}}}|يُعيّن قيمة [[خصيصة:{{{خصيصة|{{{4|}}}}}}]].}}</includeonly></onlyinclude>
+{{/وصف}}
+[[تصنيف:قوالب توثيق القوالب]]

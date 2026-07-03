@@ -1,0 +1,10 @@
+<br />
+<b>Deprecated</b>:  Use of MediaWiki\Parser\Parser::$mExtRegexFun was deprecated in MediaWiki 1.42. [Called from ExtRegexFun::onParserClearState in /var/www/html/mw/extensions/RegexFun/RegexFun.php at line 710] in <b>/var/www/html/mw/includes/debug/MWDebug.php</b> on line <b>385</b><br />
+<onlyinclude><includeonly>{{#vardefine:اسم_المصدر|{{#sub:{{PAGENAME}}|13}}}}{{#vardefine:شعار_المصدر|{{#show: {{#var:اسم_المصدر}} | ?شعار }}}}{{#vardefine:فئة_المنظّمة|{{#show: {{#var:اسم_المصدر}} | ?فئة_المنظّمة }}}}{{#vardefine:سنة_التأسيس|{{#show: {{#var:اسم_المصدر}} | ?سنة_التأسيس }}}}</includeonly>
+<div style="width: 33%; border: #831a03 solid thin; padding: .5em;">
+<span style="vertical-align: middle">[[ملف:{{#var:شعار_المصدر|Circle-icons-document.svg}}|120px|يسار]]</span>
+وثائق مصدرها <includeonly>[[{{#var:اسم_المصدر}}]]</includeonly><noinclude><samp style="text-decoration: underline; color: blue;">اسم مصدر وثائق</samp></noinclude>
+
+<includeonly>{{#if:{{#var:فئة_المنظّمة}}|{{#var:فئة_المنظّمة}} }} {{#if:{{#var:سنة_التأسيس}}|تأسّست سنة {{#var:سنة_التأسيس}} }}</includeonly><noinclude><samp>مجموعة مستقلة</samp> تأسّست سنة <samp>2011</samp></noinclude>
+</div>
+<includeonly>[[تصنيف:وثائق حسب المصدر|{{#var:اسم_المصدر}}]][[تصنيف:تصنيفات تطبقها قوالب]]</includeonly></onlyinclude>

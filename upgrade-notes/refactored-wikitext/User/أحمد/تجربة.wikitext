@@ -1,0 +1,3 @@
+<br />
+<b>Deprecated</b>:  Use of MediaWiki\Parser\Parser::$mExtRegexFun was deprecated in MediaWiki 1.42. [Called from ExtRegexFun::onParserClearState in /var/www/html/mw/extensions/RegexFun/RegexFun.php at line 710] in <b>/var/www/html/mw/includes/debug/MWDebug.php</b> on line <b>385</b><br />
+{{#vardefineecho:VAR|B}}

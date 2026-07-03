@@ -1,0 +1,19 @@
+<br />
+<b>Deprecated</b>:  Use of MediaWiki\Parser\Parser::$mExtRegexFun was deprecated in MediaWiki 1.42. [Called from ExtRegexFun::onParserClearState in /var/www/html/mw/extensions/RegexFun/RegexFun.php at line 710] in <b>/var/www/html/mw/includes/debug/MWDebug.php</b> on line <b>385</b><br />
+<includeonly>{{#vardefine:decade_lable|{{#sub:{{{2|}}}|0|3}}𝘹}}
+{{#vardefine:category_links|{{#arraymap:{{#replace:وثائق،كتب،أفلام،أغاني|{{{1}}}|}}|،|@@@|{{#ifexist:category:@@@ {{#var:decade_lable}}|* [[:تصنيف:@@@ {{#var:decade_lable}}]]}}|\n}}}}
+{{#ifeq:{{#var:category_links}}| | |طالع كذلك:
+{{#var:category_links}}}}
+[[تصنيف:{{{1}}} حسب العقد|&nbsp;]]</includeonly>
+<noinclude>يستعمل لاستبداء صفحات التصنيف بالعقود لأنواع المحتوى المختلفة. يُضمّن من قوالب بيانات عليا تولّد صفحات التصنيف تلقائيا بطريق {{رابط_إلى_قالب|تصنيف_حسب_العقد}}
+
+يعرض روابط إلى تصنيفات نفس العقد في أنواع المحتوى الأخرى من العقد المعيّن.
+
+يُضمّن بالوسم التالي:
+
+{{وسم_قالب|1::1،2::1}}
+
+حيث:
+{{بيان_معلم|1::1|اسم الوسيط في صيغة الجمع. مثلا: "أفلام" أو "كتب".}}
+{{بيان_معلم|2::1|مميز العقد، يتألف من أرقام السنة ما عدا خانة الآحاد.}}
+[[تصنيف:قوالب صفحات التصنيفات]]</noinclude>

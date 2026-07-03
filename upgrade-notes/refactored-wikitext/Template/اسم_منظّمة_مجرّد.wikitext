@@ -1,0 +1,24 @@
+<br />
+<b>Deprecated</b>:  Use of MediaWiki\Parser\Parser::$mExtRegexFun was deprecated in MediaWiki 1.42. [Called from ExtRegexFun::onParserClearState in /var/www/html/mw/extensions/RegexFun/RegexFun.php at line 710] in <b>/var/www/html/mw/includes/debug/MWDebug.php</b> on line <b>385</b><br />
+{{#vardefine:DELETION_LIST|مبادرة،مؤسسة،منظمة،مشروع}}
+هذا القالب يرجع كلمة واحدة من اسم المنظّمة الممرّ إليه في معلمه الوحيد مجرّدة لاستعمالها في أغراض الترتيب و الفهرسة، و ذلك حسب المرشجّات التالية التي يمرّ عليها بالترتيب:
+# يحذف أل التعريف من الكلمة الأولى إذا كانت موجودة و يرجعها.
+:: مثال "المبادرة المصرية للحقوق الشخصية" -> "مبادرة"
+# إذا كانت الكلمة الأولى إحدى الكلمات المعينة في قائمة الحذف يحذفها و يرجع الكلمة التالية إلى المرشّح الأوّل.
+:: أمثلة: "مؤسسة حوّاء المستقبل" -> "حواء"، و "مؤسسة المرأة الجديدة" -> "مرأة"، و "مؤسسة البصمة الجديدة للتنمية" -> "بصمة"
+
+وسم الاستخدام: {{وسم_قالب|1}}
+
+حيث:
+{{بيان معلم|1|اسم المنظّمة المراد تجريده}}
+
+و يمكن التحكم في الكلمات المطلوب حذفها من أوائل الأسماء من قائمة في الكود.
+القائمة حاليا هي: '''<var>{{#var:DELETION_LIST}}</var>'''
+
+<onlyinclude><includeonly>{{#vardefine:initial|{{#explode:{{{1|}}}| |0}}}}
+{{#ifeq:{{#sub:{{#var:initial}}|0|2}}|ال
+|{{#sub:{{#var:initial}}|2}}
+|{{#vardefine:DELETION_LIST|{{#replace:{{#var:DELETION_LIST}}|،|{{!}}}}}} {{اسم_منظّمة_مجرّد|{{#regex:{{{1|}}}|/(?:{{#var:DELETION_LIST}})\s+(.+)/|$1}}}}
+}}</includeonly></onlyinclude>
+
+[[تصنيف:قوالب منطق]]
