@@ -143,8 +143,17 @@ The script will:
 6. For each board: export Flow topics via Parsoid REST API → convert to wikitext
    → delete the old Flow board page → import the XML dump containing full
    history
-7. After all boards are processed: nuke NS 2600 (Topic namespace), run
-   `initSiteStats.php`, and `rebuildrecentchanges.php`
+7. **Fix EET/EEST timezones**: query all pages (any revision, not just latest)
+   containing `(EET)` or `(EEST)` and for each:
+   - Fetch every revision via the MW API
+   - Apply `normalize_timezones()` to normalize `(EET)` → `+02:00` and
+     `(EEST)` → `+03:00` to UTC with matching hour adjustment
+   - Apply `fix_missing_signatures()` to the newest revision (appends
+     a signature to any section that lacks one, using the revision history
+     comment `/* Section */ new section / قسم جديد` to identify the creator)
+   - Delete the page and re-import the XML dump with corrected history
+8. After all boards and EET/EEST pages are processed: nuke NS 2600 (Topic
+   namespace), run `initSiteStats.php`, and `rebuildrecentchanges.php`
 
 You can restrict the range:
 
@@ -172,13 +181,14 @@ The batch scripts handle nuking NS 2600, `initSiteStats.php`, and
 2. **Remove `$wgNamespaceContentModels`** lines that set `'flow-board'` in your
    namespace configuration (if any).
 
+
 ---
 
 ## File overview
 
 | File | Purpose | Git |
 |---|---|---|
-| `script.py` | Conversion script (reads DB, calls Parsoid, builds XML) | committed |
+| `script.py` | Conversion library — Flow → wikitext (Parsoid), EET/EEST normalization, missing-signature repair, XML export | committed |
 | `fullConvert.py` | Non-Docker orchestrator (calls PHP/MySQL directly) | committed |
 | `dockerFullConvert.py` | Docker orchestrator (routes commands via `docker exec`) | committed |
 | `settings.ini` | All configuration (DB, API, templates, Docker container names) | committed |
@@ -188,4 +198,47 @@ The batch scripts handle nuking NS 2600, `initSiteStats.php`, and
 | `families/` | Pywikibot family files (one per wiki) | committed |
 | `requirements.txt` | Python dependencies (`pymysql`, `requests`) | committed |
 
----
+## Key functions in `script.py`
+
+| Function | Purpose |
+|---|---|
+| `normalize_timezones(text)` | Scans wikitext for `(EET)` / `(EEST)` timestamps, replaces them with `(ت ع م)` (UTC) and adjusts the clock hour by −2 / −3 respectively. Operates on raw text so it handles any revision. |
+| `fix_missing_signatures(text, page_title)` | Splits wikitext into `== Section ==` blocks. If a section lacks a signature (`(ت ع م)` anywhere in the body), looks up the section creator via revision comments matching `/* Section */ new section / قسم جديد` and appends a canonical `[[User:…]] ([[User talk:…|talk]]) HH:MM، DD Month YYYY (ت ع م)` signature. Also strips any previously auto-generated duplicate signatures from earlier runs. |
+| `convertWikitextPage(page)` | Fetches **all** revisions of a non-Flow page via the MW API (`formatversion=2`), runs `normalize_timezones()` on each, runs `fix_missing_signatures()` on the newest, and returns an oldest-first list of dicts ready for `exportToXML()`. |
+| `convertBoard(page)` | Primary Flow → wikitext entry point. Fetches the Flow board header and all topics, converts each via Parsoid, merges revisions. |
+| `exportToXML(title, revs, path, model_title)` | Serializes revision dicts into a MediaWiki XML dump file suitable for `importDump.php`. |
+
+## EET/EEST timezone normalization
+
+The wiki historically stored user signatures with local Egyptian timezone
+abbreviations `(EET)` (UTC+2) and `(EEST)` (UTC+3) instead of `(ت ع م)` (UTC).
+The conversion handles this in two phases:
+
+1. **Flow boards** — `normalize_timezones()` is called inside `convertTopic()`
+   and `get_header_revs()` on the body and edit-post timestamp text before it
+   reaches `fix_missing_signatures()`.
+2. **Non-Flow talk pages** — the orchestrator's SQL query (step 7) finds all
+   pages that have `(EET)` / `(EEST)` in **any** revision. Each is passed to
+   `convertWikitextPage()` which normalises every revision, then the page is
+   deleted and re-imported with corrected history.
+
+The SQL query joins `page → revision → slots → content → text` and checks all
+revisions (not just `page_latest`) so pages whose *current* revision is clean
+but have the pattern in old revisions (e.g. `User:أحمد`) are not missed.
+
+## Missing-signature repair
+
+WikiLove (barnstars, pies, cakes) and other templates embed the sender's
+signature inside wikitable syntax `{| … |}`. The last line of such a section
+is `|}`, not the signature line. The original signature check
+(`last_para[-60:]`) would miss these, causing the script to wrongly append a
+duplicate signature generated from the revision-history comment.
+
+The fix uses a two‑pronged approach:
+- **Detection**: `"(ت ع م)" in sec_content` checks the **entire** section body
+  rather than the last 60 characters of the last paragraph.
+- **Cleanup**: Before deciding whether to add a signature, the script strips
+  any trailing lines that match the auto-generated canonical pattern
+  (`[[User:…]] ([[User talk:…|talk]]) HH:MM، DD Month YYYY (ت ع م)`) from
+  sections that already contain `(ت ع م)`. This corrects pages that were
+  previously processed with the buggy check.

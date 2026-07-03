@@ -203,6 +203,64 @@ def convert_all(skip: int = 0, end: int = 99999):
                     print(warning, file=sys.stderr)
             traceback.print_exc()
     
+    print(f"\n--- Fixing timezones in all EET/EEST pages ---")
+
+    cur.execute("""
+                SELECT DISTINCT p.page_namespace, p.page_title
+                FROM page p
+                JOIN revision r ON r.rev_page = p.page_id
+                JOIN slots s ON s.slot_revision_id = r.rev_id
+                JOIN content c ON c.content_id = s.slot_content_id
+                JOIN text t ON t.old_id = CAST(SUBSTRING(c.content_address, 4) AS UNSIGNED)
+                WHERE (t.old_text LIKE '%(EET)%' OR t.old_text LIKE '%(EEST)%')
+                  AND p.page_is_redirect = 0
+                  AND NOT (p.page_namespace = 275 AND p.page_title = 'YouTube')
+                ORDER BY p.page_namespace, p.page_title""")
+
+    eet_rows = cur.fetchall()
+    for ns, title in eet_rows:
+        processed += 1
+        if processed < skip:
+            continue
+        if processed > end:
+            break
+        title = title.decode("utf8")
+        if ns != 0:
+            try:
+                prefix = site.namespaces.resolve(ns)[0].canonical_prefix()
+                title = prefix + title
+            except Exception:
+                title = f"NS{ns}:{title}"
+        if batch_mode:
+            print(f"Fixing {title}.")
+        else:
+            input(f"Fixing {title}.")
+        page = pywikibot.Page(site, title)
+        try:
+            out_path = Path(title.replace("/", "SLASH").replace(" ", "_") + ".xml")
+            revs = script.convertWikitextPage(title)
+            if not revs:
+                print(f"No revisions for {title}, skipping.")
+                continue
+            script.exportToXML(title, revs, out_path, title)
+            assert out_path.exists()
+            page.delete(reason="Delete page to re-import with fixed timezones", prompt=False)
+            print("Importing XML to wiki...")
+            with open(out_path, "rb") as xml_file:
+                subprocess.run([
+                    "php", f"{config['other']['mw_dir_path']}/maintenance/importDump.php",
+                    f"--wiki={database}",
+                    "--username-prefix=''"
+                ], stdin=xml_file, check=True)
+            out_path.rename(xml_path / out_path.name)
+        except Exception:
+            print(f"Error fixing {title}", file=sys.stderr)
+            if script.warnings:
+                print("Extra warnings:", file=sys.stderr)
+                for warning in script.warnings:
+                    print(warning, file=sys.stderr)
+            traceback.print_exc()
+
     print("Nuking Flow Topic namespace data...")
     subprocess.run([
         "php", f"{config['other']['mw_dir_path']}/maintenance/nukeNS.php",

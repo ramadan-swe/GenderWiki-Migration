@@ -6,6 +6,7 @@ import json
 import sys
 import time
 import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pymysql
@@ -108,6 +109,186 @@ USER_AGENT = {
 }
 _session_initialized = False
 
+ARABIC_MONTHS = {
+    'يناير': 1, 'فبراير': 2, 'مارس': 3, 'أبريل': 4,
+    'مايو': 5, 'يونيو': 6, 'يوليو': 7, 'أغسطس': 8,
+    'سبتمبر': 9, 'أكتوبر': 10, 'نوفمبر': 11, 'ديسمبر': 12,
+}
+
+_EET_OFFSET = timedelta(hours=2)
+_EEST_OFFSET = timedelta(hours=3)
+
+
+def normalize_timezones(text):
+    def convert_tz(m):
+        h, m_t = map(int, m.group(1).split(':'))
+        day = int(m.group(2))
+        month_ar = m.group(3)
+        year = int(m.group(4))
+        tz_code = m.group(5)
+        month = ARABIC_MONTHS[month_ar]
+        dt = datetime(year, month, day, h, m_t)
+        offset = _EEST_OFFSET if tz_code == 'EEST' else _EET_OFFSET
+        utc_dt = dt - offset
+        return f"{utc_dt.hour:02d}:{utc_dt.minute:02d}، {utc_dt.day} {month_ar} {utc_dt.year} (ت ع م)"
+    text = re.sub(
+        r'(\d{1,2}:\d{2})،\s*(\d{1,2})\s+(\S+)\s+(\d{4})\s+\((EET|EEST)\)',
+        convert_tz,
+        text
+    )
+    text = text.replace('(UTC)', '(ت ع م)')
+    return text
+
+
+def _format_arabic_timestamp(dt):
+    month_ar = {v: k for k, v in ARABIC_MONTHS.items()}[dt.month]
+    return f"{dt.hour:02d}:{dt.minute:02d}، {dt.day} {month_ar} {dt.year}"
+
+
+def _generate_signature(username, dt):
+    sig = f"[[User:{username}|{username}]] ([[User talk:{username}|talk]])"
+    return f"{sig} {_format_arabic_timestamp(dt)} (ت ع م)"
+
+
+def fix_missing_signatures(text, page_title):
+    """Add missing signatures to sections on non-Flow talk pages.
+    Parses the wikitext into sections, checks each for a signature,
+    and attributes any missing ones from the revision history.
+    """
+    # Split into sections
+    lines = text.split('\n')
+    sections = []
+    cur_header = None
+    cur_lines = []
+    for line in lines:
+        m = re.match(r'^==\s*(.+?)\s*==\s*$', line)
+        if m:
+            if cur_header is not None or cur_lines:
+                sections.append((cur_header, '\n'.join(cur_lines)))
+            cur_header = m.group(1)
+            cur_lines = [line]
+        else:
+            cur_lines.append(line)
+    if cur_header is not None or cur_lines:
+        sections.append((cur_header, '\n'.join(cur_lines)))
+
+    # Get revision history
+    rev_params = {
+        "action": "query",
+        "titles": page_title,
+        "prop": "revisions",
+        "rvprop": "user|timestamp|comment",
+        "rvlimit": "max",
+        "format": "json",
+    }
+    try:
+        revdata = apicall(rev_params, "query", "pages")
+    except Exception:
+        revdata = {}
+    revisions = []
+    for pid, pdata in revdata.items():
+        if pid == "-1":
+            continue
+        for rev in pdata.get("revisions", []):
+            revisions.append(rev)
+
+    # Build mapping from section name to creator info
+    created_by = {}
+    for rev in revisions:
+        comment = rev.get("comment", "")
+        m = re.match(r'/\*\s*(.+?)\s*\*/\s*(?:قسم جديد|new section)', comment)
+        if m:
+            sec_name = m.group(1).strip()
+            if sec_name not in created_by:
+                created_by[sec_name] = (rev["user"], rev["timestamp"])
+    # Also check for non-comment section additions (e.g. page creation with content)
+    # For the first revision, the whole content may contain sections without comments
+    if revisions:
+        first_rev = revisions[-1]
+        ts_str = first_rev["timestamp"]
+        for sec_name, sec_content in sections:
+            if sec_name and sec_name not in created_by:
+                created_by[sec_name] = (first_rev.get("user", "Unknown"), ts_str)
+
+    # Check sections for signatures and fix
+    ARABIC_DATE_RE = r'\d{1,2}:\d{2}،\s*\d{1,2}\s+\S+\s+\d{4}\s+\((?:ت ع م|UTC|EET|EEST)\)'
+    AUTO_SIG_RE = r'^\s*\[\[User:[^\]]*\]\] \(\[\[User talk:[^\]]*\|talk\]\]\) \d{1,2}:\d{2}، \d{1,2} \S+ \d{4} \(ت ع م\)\s*$'
+    fixed_sections = []
+    for sec_name, sec_content in sections:
+        if sec_name is None:
+            fixed_sections.append(sec_content)
+            continue
+        has_sig = "(ت ع م)" in sec_content
+        if has_sig:
+            sec_lines = sec_content.split('\n')
+            while sec_lines and re.match(AUTO_SIG_RE, sec_lines[-1]):
+                sec_lines.pop()
+            sec_content = '\n'.join(sec_lines)
+            has_sig = "(ت ع م)" in sec_content
+        if not has_sig and sec_name in created_by:
+            user, ts_str = created_by[sec_name]
+            ts_str = ts_str.replace('T', '').replace('Z', '').replace('-', '').replace(':', '')
+            ts_str = ts_str[:14]
+            try:
+                dt = datetime.strptime(ts_str, '%Y%m%d%H%M%S')
+            except ValueError:
+                dt = datetime.strptime(ts_str[:8], '%Y%m%d')
+            sig = _generate_signature(user, dt)
+            sec_content = sec_content.rstrip('\n') + '\n' + sig
+        fixed_sections.append(sec_content)
+
+    text = '\n'.join(fixed_sections)
+    return text
+
+
+def convertWikitextPage(page):
+    """Convert a non-Flow wikitext talk page (User_talk/Project_talk) to XML-ready
+    revision list, applying timezone and signature fixes.
+    Returns a list of revision dicts compatible with exportToXML().
+    """
+    rev_params = {
+        "action": "query",
+        "titles": page,
+        "prop": "revisions",
+        "rvprop": "content|timestamp|user|comment|flags",
+        "rvlimit": "max",
+        "format": "json",
+        "formatversion": "2",
+    }
+    revdata = apicall(rev_params, "query", "pages")
+    revs_from_api = []
+    for page_entry in revdata:
+        if "missing" in page_entry:
+            continue
+        for rev in page_entry.get("revisions", []):
+            revs_from_api.append(rev)
+
+    revs = []
+    for i, rev in enumerate(revs_from_api):
+        content = rev.get("content", rev.get("*", ""))
+        if content:
+            content = normalize_timezones(content)
+        rev_entry = {
+            "author": {"name": rev["user"]},
+            "timestamp": rev["timestamp"].replace('T', '').replace('Z', '').replace('-', '').replace(':', '')[:14],
+            "content": {"content": content},
+        }
+        if "comment" in rev:
+            rev_entry["editsummary"] = rev["comment"]
+        if rev.get("minor", False):
+            rev_entry["minor"] = True
+        revs.append(rev_entry)
+
+    # Apply signature fix to the newest revision, then
+    # reverse to oldest-first order for exportToXML
+    if revs:
+        revs[0]["content"]["content"] = fix_missing_signatures(
+            revs[0]["content"]["content"], page
+        )
+    revs.reverse()
+
+    return revs
+
 
 def _init_session():
     global _session_initialized
@@ -191,7 +372,7 @@ def get_header_revs(title: str):
             elif lqt_match[1] not in lqt_pages:
                 lqt_pages.append(lqt_match[1])
             content = re.sub(pat, "", content)
-        revision["content"]["content"] = content
+        revision["content"]["content"] = normalize_timezones(content)
         # Add an edit summary for later and move on the next revision
         prev = revision["previousRevisionId"]
         revision["editsummary"] = "Edited header"
@@ -449,7 +630,7 @@ def convertTopic(root: str, year: int | None = None):
                     editsummary = "Added reply"
                 if revision["content"]["content"]:
                     blocks[revid] = {
-                        "body": revision["content"]["content"],
+                        "body": normalize_timezones(revision["content"]["content"]),
                         "children": [],
                         "signature": getSignature(revision),
                     }
@@ -487,7 +668,7 @@ def convertTopic(root: str, year: int | None = None):
                             continue
                 if "ignoreme" in blocks[postID]:
                     content = content.replace(blocks[postID]["ignoreme"], "")
-                blocks[postID]["body"] = content
+                blocks[postID]["body"] = normalize_timezones(content)
                 editsummary = "Edited post"
             case "lock-topic" | "close-topic":
                 # lock- is standard, close- is some pre-2014 oddity?
@@ -676,7 +857,7 @@ def getSignature(revision: dict):
             revision["author"].get("name", "Unknown user"), revision["author"]["id"]
         )
     date = revision["dateFormats"]["timeAndDate"]
-    sig = f"{sig} {date} (UTC)"
+    sig = f"{sig} {date} (ت ع م)"
     return sig
 
 
@@ -831,10 +1012,7 @@ def getText(
                 if body.endswith(siglike):
                     body = body[: -len(siglike)] + "</nowiki>"
                     break
-            if "(UTC)" in body[-10:]:
-                # If it looks like there's already a signature there then don't add another one
-                # Some people use odd signatures that put the timestamp part in italics for example
-                # so look near the end too
+            if "(ت ع م)" in body:
                 signature = ""
             if indent > 0:
                 try:

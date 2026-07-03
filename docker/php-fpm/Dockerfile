@@ -7,7 +7,7 @@ RUN apt-get update \
         libicu-dev libpng-dev libjpeg-dev libfreetype6-dev libzip-dev libxml2-dev zlib1g-dev libonig-dev git unzip ca-certificates \
     && docker-php-ext-configure intl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) pdo_mysql mysqli mbstring xml intl gd zip opcache \
+    && docker-php-ext-install -j$(nproc) pdo_mysql mysqli mbstring xml intl gd zip opcache calendar \
     && pecl install apcu || true \
     && docker-php-ext-enable apcu || true \
     && mkdir -p /var/cache/wikido.xyz/genderiyya \

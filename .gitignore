@@ -1,5 +1,5 @@
 www/*
-www-backup*/
+www-*/
 mediawiki-*/
 *.sql
 __pycache__/

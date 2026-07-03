@@ -1,0 +1,5 @@
+services:
+  php-fpm:
+    build:
+      context: ./docker/php-fpm
+      dockerfile: Dockerfile-1.35.5

@@ -15,7 +15,9 @@ services:
       - db_data:/var/lib/mysql
 
   php-fpm:
-    build: ./docker/php-fpm
+    build:
+      context: ./docker/php-fpm
+      dockerfile: Dockerfile-1.43
     depends_on:
       - db
     volumes:
