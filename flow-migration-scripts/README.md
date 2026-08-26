@@ -68,6 +68,19 @@ print(f':pbkdf2:sha512:30000:64:{base64.b64encode(salt).decode()}:{base64.b64enc
 "
 ```
 
+### 4. Delete the bot account (if needed)
+
+MW 1.35 has no `deleteUser.php`. Delete both `user` and `actor` rows:
+
+```bash
+mysql -u <db_user> -p<db_password> <database> -e \
+  "DELETE FROM user WHERE user_name = 'FlowMigrationBot';
+   DELETE FROM actor WHERE actor_name = 'FlowMigrationBot';"
+```
+
+Without cleaning `actor`, re-creating the same username fails with
+`Duplicate entry ... for key 'actor_name'`.
+
 ---
 
 ## Setup
