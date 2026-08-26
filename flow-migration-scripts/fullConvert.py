@@ -18,74 +18,13 @@ class FlowMigrator:
             print("Creating the one and only FlowMigrator instance...")
             cls._instance = super().__new__(cls)
             cls._instance.config = script.get_config()
-            # 1. First ensure the bot user exists on the wiki (before pywikibot login)
-            cls._instance._create_and_promote_bot(cls._instance.config)
-            # 2. Then initialize Pywikibot Site and login
+            # 1. Initialize Pywikibot Site and login
             cls._instance.site = Site(*cls._instance.config["pywikibot"])
             cls._instance.site.login()
-            # 3. Create marker templates once
+            # 2. Create marker templates once
             cls._instance._create_templates(cls._instance.config)
 
         return cls._instance
-
-    @staticmethod
-    def _get_password_from_file(file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            import ast
-            return ast.literal_eval(f.read().strip())[2]
-
-    @staticmethod
-    def _generate_mw_hash(password: str) -> str:
-        import hashlib, base64, os
-        salt = os.urandom(16)
-        dk = hashlib.pbkdf2_hmac('sha512', password.encode(), salt, 30000, dklen=64)
-        salt_b64 = base64.b64encode(salt).decode()
-        dk_b64 = base64.b64encode(dk).decode()
-        return f":pbkdf2:sha512:30000:64:{salt_b64}:{dk_b64}"
-
-    def _create_and_promote_bot(self, config):
-        database = config['dbconf']['database']
-        db_user = config['dbconf']['user']
-        db_password = config['dbconf']['password']
-        PASSWORD_FILE_PATH = "user-passwords.py"
-
-        try:
-            bot_password = self._get_password_from_file(PASSWORD_FILE_PATH)
-            print("Checking/Creating the FlowMigrationBot account via maintenance script...")
-
-            # createAndPromote to create user and grant groups
-            subprocess.run([
-                "php", f"{config['other']['mw_dir_path']}/maintenance/createAndPromote.php",
-                f"--wiki={database}", "--force", "--bot", "--sysop",
-                "FlowMigrationBot", bot_password
-            ], check=True)
-
-            print("Account verified/created and granted bot/sysop rights successfully!")
-
-            # Set and confirm email
-            subprocess.run([
-                "php", f"{config['other']['mw_dir_path']}/maintenance/resetUserEmail.php",
-                f"--wiki={database}", "FlowMigrationBot", "bot@genderiyya.xyz"
-            ], check=True)
-
-            subprocess.run([
-                "mysql", "-u", f"{db_user}", f"-p{db_password}", database,
-                "-e", "UPDATE user SET user_email_authenticated = DATE_FORMAT(NOW(), '%Y%m%d%H%i%s') WHERE user_name = 'FlowMigrationBot';"
-            ], check=True)
-
-            # Directly set the password hash via SQL, AFTER all
-            # maintenance scripts (createAndPromote, resetUserEmail) are
-            # done so none of them can overwrite it.
-            mw_hash = self._generate_mw_hash(bot_password)
-            subprocess.run([
-                "mysql", "-u", f"{db_user}", f"-p{db_password}", database,
-                "-e", f"UPDATE user SET user_password = '{mw_hash}' WHERE user_name = 'FlowMigrationBot';"
-            ], check=True)
-
-        except subprocess.CalledProcessError as e:
-            print(f"Server-side user setup failed: {e}", file=sys.stderr)
-        except Exception as e:
-            print(f"Error initializing user creation setup: {e}", file=sys.stderr)
 
     @staticmethod
     def _extract_template_name(raw: str) -> str | None:

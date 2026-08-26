@@ -16,12 +16,57 @@ Both share `script.py` (the conversion script) and `settings.ini` (configuration
 
 - Python 3.10+ with `pymysql` and `requests` (install via `pip install -r requirements.txt`)
 - A pywikibot installation (the scripts import `pywikibot`)
-- Shell access to MediaWiki maintenance scripts (`createAndPromote.php`,
-  `changePassword.php`, `resetUserEmail.php`, `importDump.php`, `nukeNS.php`,
-  `initSiteStats.php`, `rebuildrecentchanges.php`)
-- A bot/sysop wiki account — `FlowMigrationBot` is auto-created by the script
+- Shell access to MediaWiki maintenance scripts (`importDump.php`,
+  `nukeNS.php`, `initSiteStats.php`, `rebuildrecentchanges.php`)
+- A bot/sysop wiki account — **must be created manually before running the scripts** (see below)
 - Direct MySQL access to the wiki database
 - `user-config.py` and `settings.ini`
+
+---
+
+## Bot account setup
+
+The `FlowMigrationBot` account must exist **before** running any migration script.
+The scripts do not create or configure the bot — they only log in with it.
+
+### 1. Create the account
+
+```bash
+php /path/to/maintenance/createAndPromote.php \
+  --wiki=<database> --force --bot --sysop \
+  FlowMigrationBot '<strong_password>'
+```
+
+### 2. Confirm email (bypasses `$wgEmailConfirmToEdit`)
+
+```bash
+php /path/to/maintenance/resetUserEmail.php \
+  --wiki=<database> FlowMigrationBot bot@genderiyya.xyz
+
+mysql -u <db_user> -p<db_password> <database> -e \
+  "UPDATE user SET user_email_authenticated = DATE_FORMAT(NOW(), '%Y%m%d%H%i%s') WHERE user_name = 'FlowMigrationBot';"
+```
+
+### 3. Set password hash via SQL
+
+`createAndPromote.php` may overwrite the password hash. Set it **after**
+all maintenance scripts are done:
+
+```bash
+mysql -u <db_user> -p<db_password> <database> -e \
+  "UPDATE user SET user_password = ':pbkdf2:sha512:30000:64:<salt_b64>:<dk_b64>' WHERE user_name = 'FlowMigrationBot';"
+```
+
+Generate the hash with:
+
+```python
+python3 -c "
+import hashlib, base64, os
+salt = os.urandom(16)
+dk = hashlib.pbkdf2_hmac('sha512', b'<strong_password>', salt, 30000, dklen=64)
+print(f':pbkdf2:sha512:30000:64:{base64.b64encode(salt).decode()}:{base64.b64encode(dk).decode()}')
+"
+```
 
 ---
 
