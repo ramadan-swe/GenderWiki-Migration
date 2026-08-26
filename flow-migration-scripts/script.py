@@ -1262,6 +1262,7 @@ def get_topiclist_blocks(page, yearlen):
         "format": "json",
         "vtllimit": "max",
         "vtlsortby": "newest",
+        "vtlformat": "wikitext",
     }
     roots = []
     while True:
@@ -1343,6 +1344,7 @@ def convertBoard(page: str, year: int | None = None, maxsize: int | None = None)
         "format": "json",
         "vtllimit": "max",
         "vtlsortby": "newest",
+        "vtlformat": "wikitext",
     }
     revisions, default = convertHeader(page, year)
     roots = []

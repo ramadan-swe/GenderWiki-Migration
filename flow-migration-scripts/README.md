@@ -47,17 +47,25 @@ mysql -u <db_user> -p<db_password> <database> -e \
   "UPDATE user SET user_email_authenticated = DATE_FORMAT(NOW(), '%Y%m%d%H%i%s') WHERE user_name = 'FlowMigrationBot';"
 ```
 
-### 3. Set password hash via SQL
+### 3. Reset the password (if login fails)
 
-`createAndPromote.php` may overwrite the password hash. Set it **after**
-all maintenance scripts are done:
+After a DB volume reset or re-import, the password hash from the dump may
+not match `user-passwords.py`. Re-run `createAndPromote.php` with `--force`
+to overwrite it:
+
+```bash
+php /path/to/maintenance/createAndPromote.php \
+  --wiki=<database> --force --bot --sysop \
+  FlowMigrationBot '<strong_password>'
+```
+
+Alternatively, set the hash directly via SQL (generate the hash with the
+Python snippet below):
 
 ```bash
 mysql -u <db_user> -p<db_password> <database> -e \
   "UPDATE user SET user_password = ':pbkdf2:sha512:30000:64:<salt_b64>:<dk_b64>' WHERE user_name = 'FlowMigrationBot';"
 ```
-
-Generate the hash with:
 
 ```python
 python3 -c "
@@ -194,8 +202,7 @@ The script will:
 
 1. Ensure the `FlowMigrationBot` account exists and is a sysop+bot
 2. Confirm the bot's email (bypasses `$wgEmailConfirmToEdit`)
-3. Set the bot's password hash directly via SQL (workaround for a
-   `createAndPromote.php` bug)
+3. Set the bot's password hash via `createAndPromote.php --force` or SQL
 4. Create marker templates (`قالب:فلو-ممكّن`, `قالب:ل-ك-ت-ممكّن`)
 5. Query the database for all `flow-board` pages
 6. For each board: export Flow topics via Parsoid REST API → convert to wikitext
